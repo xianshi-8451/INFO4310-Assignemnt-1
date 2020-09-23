@@ -1,0 +1,164 @@
+<html>
+<head>
+  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests">
+	<link href="https://fonts.googleapis.com/css?family=Lato:400,700|Raleway:400,700" rel="stylesheet">
+  <link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.14.2/styles/default.min.css">
+  <script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.14.2/highlight.min.js"></script>
+  <script src="https://d3js.org/d3.v5.min.js"></script>
+  <script src="https://d3js.org/topojson.v2.min.js"></script>
+  <style>
+
+  .neighborhood {
+    fill: #EEE;
+    stroke: white;
+    stroke-width: 2px;
+  }
+
+  </style>
+</head>
+<body>
+	<svg id="points" height="900" width="900" style="background: #fff; margin-top:50px" >
+
+  </svg>
+  
+	<script>
+
+  const svg = d3.select("#points");
+  const width = svg.attr("width");
+  const height = svg.attr("height");
+  const margin = { top: 20, right: 20, bottom: 20, left:20};
+  const mapWidth = width - margin.left - margin.right;
+  const mapHeight = height - margin.top - margin.bottom;
+  const map = svg.append("g")
+                  .attr("transform","translate("+margin.left+","+margin.top+")");
+  				// ["#0059b3","#0059b3","#99ffcc",
+      //           "#00b359","#ffffb3","#ffff00",
+      //           "#ff8080","#cc0000","#e699ff","#730099",
+      //           "#99ccff"]
+
+	const requestData = async function(){
+	const sf = await d3.json("datasets/SF-Neighborhoods.geo.json");
+	var neighborhoods = topojson.feature(sf, sf.objects.SFNeighborhoods);
+	var projection = d3.geoMercator().fitSize([mapWidth, mapHeight], neighborhoods);
+  var path = d3.geoPath().projection(projection);
+    map.selectAll("path.neighborhood").data(neighborhoods.features)
+       .join("path")
+       .attr("class", "neighborhood")
+       .attr("d", path);
+      
+      let dataArr = [];
+	 	  const data = d3.csv("datasets/Street_Tree_List-2020-08-20_FILTERED.csv").then(function(data){
+	 		data.forEach(function(item) {
+             var Genus = item["qSpecies"].split("::")[0];
+             var temp = {
+                 "ID": Number(item["TreeID"]),
+                 "Genus": Genus,
+                 "Latitude": Number(item['Latitude']),
+                 "Longitude": Number(item['Longitude'])
+             }
+             dataArr.push(temp);
+         });
+             console.log(dataArr);
+        	 dataArr.forEach( d => {
+      
+      		d.Position = projection( [d.Longitude, d.Latitude] );
+      
+    		});
+
+        const colorScale=d3.scaleOrdinal()
+                .domain(getTop10Trees(dataArr))
+                .range(["#0059b3","#99ffcc",
+                "#00b359","#ffffb3","#ffff00",
+                "#ff8080","#cc0000","#e699ff","#730099",
+                "#99ccff"]);
+        console.log(getTop10Trees(dataArr));
+     		 map.selectAll("circle").data(dataArr)
+       			.join("circle")
+       			.attr("r", 1)
+       			.attr("fill",function(d,i) {
+                    return(colorScale(i));
+                })
+       			.attr("opacity", 0.4)
+       			.attr("cx", d => d.Position[0])
+       			.attr("cy", d => d.Position[1]);
+
+        
+        let legend = svg.append("rect")
+            .attr("height", 70)
+            .attr("width", 150)
+            .attr("fill","none")
+            .attr("stroke","black")
+            .attr('transform', 'translate(10,10)');
+    
+        svg.append("text")
+            .attr("x", 65)
+            .attr("y", 10)
+            .attr("dy", "1em")
+            .attr("color","black")
+            .style("font-weight","bold")
+            .text("Species");
+    
+        svg.append("rect")
+            .attr("width","25")
+            .attr("height","3")
+            .attr("x", 30)
+            .attr("y", 40)
+            .attr("dy", "1em")
+            .attr("fill","#0059b3")
+    
+        svg.append("rect")
+            .attr("width","25")
+            .attr("height","3")
+            .attr("x", 30)
+            .attr("y", 60)
+            .attr("dy", "1em")
+            .attr("fill","#99ffcc")
+    
+        svg.append("text")
+            .attr("x", 60)
+            .attr("y", 30)
+            .attr("dy", "1em")
+            .attr("color","black")
+            .style("font-size",11)
+            .text("Platanus x hispanica");
+    
+        svg.append("text")
+            .attr("x", 60)
+            .attr("y", 52)
+            .attr("dy", "1em")
+            .attr("color","black")
+            .style("font-size",11)
+            .text("Metrosideros excelsa");
+
+    });
+  }
+  
+       
+	 requestData();
+function getTop10Trees(treeData){
+  let TreeFreq ={};
+  var sortable=[];
+  for(var i = 0; i<treeData.length; i++){
+    var Genus = treeData[i]["Genus"];
+    if(Genus in TreeFreq){
+      TreeFreq[Genus]+=1;
+    }else{
+      TreeFreq[Genus]=1;
+    }
+
+  };
+  for (var Genus in TreeFreq) {
+    sortable.push([Genus, TreeFreq[Genus]]);
+}
+
+  sortable.sort(function(a, b) {
+    return b[1] - a[1];
+});
+sortable = sortable.slice(0,10);
+return sortable;
+}
+
+ 
+	</script>
+</body>
+</html>
